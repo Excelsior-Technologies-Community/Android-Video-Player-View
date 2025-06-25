@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- VideoPlayerLibrary Custom Attributes -->
+    <declare-styleable name="VideoPlayerLibrary">
+
+        <!-- Colors -->
+        <attr name="vpl_primaryColor" format="color" />
+        <attr name="vpl_secondaryColor" format="color" />
+        <attr name="vpl_backgroundColor" format="color" />
+        <attr name="vpl_textColor" format="color" />
+
+        <!-- Text Sizes -->
+        <attr name="vpl_titleTextSize" format="dimension" />
+        <attr name="vpl_timeTextSize" format="dimension" />
+
+        <!-- Video Properties -->
+        <attr name="vpl_videoTitle" format="string" />
+        <attr name="vpl_videoPath" format="string" />
+        <attr name="vpl_autoPlay" format="boolean" />
+        <attr name="vpl_loopVideo" format="boolean" />
+
+        <!-- Controls Settings -->
+        <attr name="vpl_showControls" format="boolean" />
+        <attr name="vpl_autoHideControls" format="boolean" />
+        <attr name="vpl_controlsTimeout" format="integer" />
+        <attr name="vpl_showTitle" format="boolean" />
+        <attr name="vpl_showSeekBar" format="boolean" />
+        <attr name="vpl_showTimeLabels" format="boolean" />
+
+        <!-- Gesture Settings -->
+        <attr name="vpl_enableGestures" format="boolean" />
+        <attr name="vpl_enableSwipeSeek" format="boolean" />
+        <attr name="vpl_enableVolumeGesture" format="boolean" />
+        <attr name="vpl_enableBrightnessGesture" format="boolean" />
+        <attr name="vpl_enableDoubleTapSeek" format="boolean" />
+
+        <!-- Seek Settings -->
+        <attr name="vpl_seekStepSize" format="integer" />
+        <attr name="vpl_swipeSeekSensitivity" format="float" />
+        <attr name="vpl_showSeekPreview" format="boolean" />
+
+        <!-- Volume & Brightness Settings -->
+        <attr name="vpl_volumeStepSize" format="float" />
+        <attr name="vpl_brightnessStepSize" format="float" />
+        <attr name="vpl_showVolumeIndicator" format="boolean" />
+        <attr name="vpl_showBrightnessIndicator" format="boolean" />
+
+        <!-- Player Behavior -->
+        <attr name="vpl_pauseOnFocusLoss" format="boolean" />
+        <attr name="vpl_resumeOnFocusGain" format="boolean" />
+        <attr name="vpl_keepScreenOn" format="boolean" />
+
+        <!-- UI Customization -->
+        <attr name="vpl_controlsBackgroundAlpha" format="float" />
+        <attr name="vpl_playButtonSize" format="dimension" />
+        <attr name="vpl_seekBarHeight" format="dimension" />
+        <attr name="vpl_cornerRadius" format="dimension" />
+
+        <!-- Animation Settings -->
+        <attr name="vpl_fadeAnimationDuration" format="integer" />
+        <attr name="vpl_enableFadeAnimations" format="boolean" />
+        <attr name="vpl_gestureAnimationDuration" format="integer" />
+
+        <!-- Loading Settings -->
+        <attr name="vpl_showLoadingIndicator" format="boolean" />
+        <attr name="vpl_loadingIndicatorColor" format="color" />
+
+        <!-- Error Handling -->
+        <attr name="vpl_showErrorMessage" format="boolean" />
+        <attr name="vpl_errorTextColor" format="color" />
+        <attr name="vpl_retryButtonEnabled" format="boolean" />
+
+    </declare-styleable>
+
+</resources>
