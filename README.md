@@ -1,6 +1,6 @@
-# VideoPlayerLibrary
+# Android Video Player View
 
-A lightweight, customizable video player library for Android applications built with Kotlin. This library provides essential video playback controls with a focus on simplicity and performance.
+A lightweight, customizable video player library for Android applications built with Kotlin. This library provides essential video playback controls with a focus on simplicity and performance.It is also compatible with latest Android versions too, like Android 14 and Android 15.
 
 ## 🚀 Features
 
@@ -36,7 +36,7 @@ allprojects {
 
 ```gradle
 dependencies {
-    implementation("com.github.yashraiyani098:VideoPlayerLibrary:1.0.0")
+	        implementation("com.github.Excelsior-Technologies-Community:Android-Video-Player-View:1.0.0")
 }
 ```
 
@@ -190,7 +190,7 @@ override fun onDestroy() {
 
 MIT License
 
-Copyright (c) 2024 Yash Raiyani
+Copyright (c) 2025 Excelsior Technologies 
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
