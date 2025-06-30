@@ -6,11 +6,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.ext.videoplayerlibrary.VideoPlayerLibrary
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.PagerSnapHelper
+import androidx.recyclerview.widget.RecyclerView
+
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var videoPlayer: VideoPlayerLibrary
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var videosAdapter: VideosAdapter
+    private lateinit var layoutManager: LinearLayoutManager
+    private var currentVisiblePosition = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,163 +30,177 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // Initialize the video player
-        videoPlayer = findViewById(R.id.videoPlayer)
-
-        // Set up the video player
-        setupVideoPlayer()
-
-        // Load and play video
-        loadVideo()
+        setupRecyclerView()
+        loadVideoData()
     }
 
-    private fun setupVideoPlayer() {
-        // Configure player settings using available methods
-        videoPlayer.setControlsTimeout(5000L) // 5 seconds
-        videoPlayer.setSeekStepSize(15000) // 15 seconds
-        videoPlayer.setSwipeSeekSensitivity(1.2f)
-        videoPlayer.setVolumeStepSize(0.05f)
-        videoPlayer.setBrightnessStepSize(0.05f)
+    private fun setupRecyclerView() {
+        recyclerView = findViewById(R.id.rvVideos)
+        videosAdapter = VideosAdapter()
+        layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
 
-        // Set video player listener
-        videoPlayer.setOnVideoPlayerListener(object : VideoPlayerLibrary.OnVideoPlayerListener {
-            override fun onVideoPrepared(duration: Int) {
-                println("Video prepared with duration: ${duration}ms")
-                // Convert duration to readable format
-                val minutes = duration / 1000 / 60
-                val seconds = (duration / 1000) % 60
-                println("Duration: ${minutes}:${String.format("%02d", seconds)}")
+        recyclerView.apply {
+            adapter = videosAdapter
+            layoutManager = this@MainActivity.layoutManager
+            setHasFixedSize(true)
+
+            // Add PagerSnapHelper for Instagram-like scrolling
+            val snapHelper = PagerSnapHelper()
+            snapHelper.attachToRecyclerView(this)
+
+            // Modified scroll listener - only track visible position, don't auto-play
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+
+                    if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                        // Only update the current visible position
+                        val position = findVisibleVideoPosition()
+                        if (position != -1) {
+                            currentVisiblePosition = position
+                            println("Current visible position: $position")
+                        }
+                    }
+                }
+
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+
+                    // Optional: Pause videos that are no longer visible
+                    pauseNonVisibleVideos()
+                }
+            })
+        }
+    }
+
+    private fun pauseNonVisibleVideos() {
+        val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+
+        // Get current playing position from adapter
+        val currentPlayingPosition = videosAdapter.getCurrentPlayingPosition()
+
+        // Pause currently playing video if it's not in visible range
+        if (currentPlayingPosition != -1 &&
+            (currentPlayingPosition < firstVisiblePosition || currentPlayingPosition > lastVisiblePosition)) {
+            videosAdapter.pauseAllVideos()
+        }
+    }
+
+    private fun findVisibleVideoPosition(): Int {
+        val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+
+        // Find the item that is most visible (center of screen)
+        var maxVisibleHeight = 0
+        var mostVisiblePosition = -1
+
+        for (i in firstVisiblePosition..lastVisiblePosition) {
+            val view = layoutManager.findViewByPosition(i)
+            view?.let {
+                val visibleHeight = getVisibleHeight(it)
+                if (visibleHeight > maxVisibleHeight) {
+                    maxVisibleHeight = visibleHeight
+                    mostVisiblePosition = i
+                }
             }
+        }
 
-            override fun onVideoStarted() {
-                println("Video started playing")
-            }
+        return mostVisiblePosition
+    }
 
-            override fun onVideoPaused() {
-                println("Video paused")
-            }
+    private fun getVisibleHeight(view: android.view.View): Int {
+        val recyclerViewTop = recyclerView.top
+        val recyclerViewBottom = recyclerView.bottom
+        val viewTop = view.top
+        val viewBottom = view.bottom
 
-            override fun onVideoCompleted() {
-                println("Video playback completed")
-                // Optionally restart or show completion message
-            }
+        val visibleTop = maxOf(recyclerViewTop, viewTop)
+        val visibleBottom = minOf(recyclerViewBottom, viewBottom)
 
-            override fun onVideoError(what: Int, extra: Int) {
-                println("Video error: what=$what, extra=$extra")
-                // Handle error - maybe show error message to user
-            }
+        return maxOf(0, visibleBottom - visibleTop)
+    }
 
-            override fun onSeekTo(position: Int) {
-                println("Seeked to position: ${position}ms")
-            }
+    private fun loadVideoData() {
+        // Create sample video data
+        val videoList = mutableListOf<VideoItem>()
 
-            override fun onProgressUpdated(currentPosition: Int, duration: Int) {
-                // This is called every second during playback
-                // You can use this for custom progress tracking
-            }
+        try {
+            // First, try to add videos from raw resources (if they exist)
+            val rawVideoResources = listOf(
+                Pair(R.raw.sample_video, "Sample Video 1"),
+            )
 
-            override fun onSpeedChanged(speed: Float) {
-                println("Playback speed changed to: ${speed}x")
-            }
-
-            override fun onQualityChanged(quality: String) {
-                println("Video quality changed to: $quality")
-            }
-
-            override fun onSubtitleChanged(subtitle: String) {
-                println("Subtitle changed to: $subtitle")
-            }
-
-            override fun onOrientationChanged(orientation: Int) {
-                println("Screen orientation changed to: $orientation")
-            }
-
-            override fun onFullScreenChanged(isFullScreen: Boolean) {
-                println("Full screen mode: $isFullScreen")
-                if (isFullScreen) {
-                    // Hide status bar or action bar if needed
-                    supportActionBar?.hide()
-                } else {
-                    // Show status bar or action bar
-                    supportActionBar?.show()
+            rawVideoResources.forEach { (resourceId, title) ->
+                try {
+                    videoList.add(
+                        VideoItem(
+                            videoUri = Uri.parse("android.resource://$packageName/$resourceId"),
+                            title = title,
+                            qualityOptions = arrayListOf("Auto", "1080p", "720p", "480p", "360p"),
+                            subtitleOptions = arrayListOf("None", "English", "Spanish", "French")
+                        )
+                    )
+                } catch (e: Exception) {
+                    println("Resource $title not found in raw resources")
                 }
             }
 
-            override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
-                println("Picture-in-Picture mode: $isInPictureInPictureMode")
-            }
+            // Add external sample videos (these are publicly available test videos)
+            val externalVideos = listOf(
+                VideoItem(
+                    videoUri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
+                    title = "Big Buck Bunny",
+                    qualityOptions = arrayListOf("Auto", "1080p", "720p", "480p"),
+                    subtitleOptions = arrayListOf("None", "English")
+                ),
+                VideoItem(
+                    videoUri = Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
+                    title = "Tears of Steel",
+                    qualityOptions = arrayListOf("Auto", "1080p", "720p", "480p"),
+                    subtitleOptions = arrayListOf("None", "English", "Spanish", "French")
+                )
+            )
 
-            override fun onPlayerLocked(isLocked: Boolean) {
-                println("Player locked: $isLocked")
-            }
+            videoList.addAll(externalVideos)
 
-            override fun onVolumeChanged(volume: Int, maxVolume: Int) {
-                println("Volume changed to: $volume/$maxVolume")
-                val volumePercentage = (volume * 100) / maxVolume
-                println("Volume percentage: $volumePercentage%")
-            }
+        } catch (e: Exception) {
+            println("Error loading video data: ${e.message}")
+            e.printStackTrace()
+        }
 
-            override fun onBrightnessChanged(brightness: Float) {
-                println("Brightness changed to: $brightness")
-                val brightnessPercentage = (brightness * 100).toInt()
-                println("Brightness percentage: $brightnessPercentage%")
-            }
-        })
-    }
+        if (videoList.isNotEmpty()) {
+            videosAdapter.setVideoList(videoList)
+            println("Loaded ${videoList.size} videos successfully")
 
-    private fun loadVideo() {
-        // Option 1: Load from raw resource
-        val videoUri = Uri.parse("android.resource://$packageName/${R.raw.sample_video}")
-        videoPlayer.setVideoUri(videoUri)
-
-        // Option 2: Load from assets folder
-        // val videoUri = Uri.parse("android.asset://sample_video.mp4")
-        // videoPlayer.setVideoUri(videoUri)
-
-        // Option 3: Load from external URL
-        // val videoUri = Uri.parse("https://example.com/sample_video.mp4")
-        // videoPlayer.setVideoUri(videoUri)
-
-        // Option 4: Load from file path
-        // val videoUri = Uri.parse("file:///android_asset/sample_video.mp4")
-        // videoPlayer.setVideoUri(videoUri)
-
-        // Set video title
-        videoPlayer.setVideoTitle("Sample Video Title")
-
-        // Set quality options (optional)
-        val qualityOptions = arrayListOf("Auto", "1080p", "720p", "480p", "360p")
-        videoPlayer.setQualityOptions(qualityOptions)
-
-        // Set subtitle options (optional)
-        val subtitleOptions = arrayListOf("None", "English", "Spanish", "French")
-        videoPlayer.setSubtitleOptions(subtitleOptions)
-
-        // Set initial playback speed (optional)
-        videoPlayer.setPlaybackSpeed(1.0f)
+            // Don't auto-play any video - wait for user interaction
+            currentVisiblePosition = 0
+        } else {
+            println("No videos to load")
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        // The library handles pause/resume automatically
-        videoPlayer.onPause()
+        // Use the actual adapter method for activity pause
+        videosAdapter.onActivityPause()
     }
 
     override fun onResume() {
         super.onResume()
-        // The library handles pause/resume automatically
-        videoPlayer.onResume()
+        // Use the actual adapter method for activity resume
+        videosAdapter.onActivityResume()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Clean up resources
-        videoPlayer.onDestroy()
+        // Release all video players
+        videosAdapter.releaseAllPlayers()
     }
 
     override fun onBackPressed() {
-        // Handle back press for full screen mode
-        if (!videoPlayer.onBackPressed()) {
+        // Handle back press through adapter (for fullscreen exit, etc.)
+        if (!videosAdapter.handleBackPress()) {
             super.onBackPressed()
         }
     }
@@ -191,64 +211,52 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
 
-        // Handle PiP mode changes
+        // Handle PiP mode changes for current video
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            videoPlayer.onPictureInPictureModeChanged(isInPictureInPictureMode)
+            // The video player library should handle PiP mode internally
+            // through the OnVideoPlayerListener.onPictureInPictureModeChanged callback
         }
     }
 
-    // Helper methods for external control (optional)
-    private fun playVideo() {
-        if (!videoPlayer.isVideoPlaying()) {
-            // Trigger play by simulating tap on play button
-            // The library handles play/pause internally
-        }
+    // Helper methods for external control
+    fun getCurrentVideoPosition(): Int {
+        return currentVisiblePosition
     }
 
-    private fun pauseVideo() {
-        if (videoPlayer.isVideoPlaying()) {
-            // Trigger pause by simulating tap on pause button
-            // The library handles play/pause internally
-        }
+    fun getCurrentPlayingPosition(): Int {
+        return videosAdapter.getCurrentPlayingPosition()
     }
 
-    private fun seekToPosition(positionMs: Int) {
-        videoPlayer.seekToPosition(positionMs)
+    // Method to get current visible video view holder for manual control
+    fun getCurrentVisibleVideoHolder(): VideosAdapter.VideoViewHolder? {
+        return recyclerView.findViewHolderForAdapterPosition(currentVisiblePosition) as? VideosAdapter.VideoViewHolder
     }
 
-    private fun getCurrentPosition(): Int {
-        return videoPlayer.getCurrentPosition()
+    // Method to get currently playing video view holder
+    fun getCurrentPlayingVideoHolder(): VideosAdapter.VideoViewHolder? {
+        val playingPosition = videosAdapter.getCurrentPlayingPosition()
+        return if (playingPosition != -1) {
+            recyclerView.findViewHolderForAdapterPosition(playingPosition) as? VideosAdapter.VideoViewHolder
+        } else null
     }
 
-    private fun getDuration(): Int {
-        return videoPlayer.getDuration()
+    fun addVideo(videoItem: VideoItem) {
+        videosAdapter.addVideo(videoItem)
     }
 
-    private fun isPlaying(): Boolean {
-        return videoPlayer.isVideoPlaying()
+    fun pauseAllVideos() {
+        videosAdapter.pauseAllVideos()
     }
 
-    private fun enterFullScreen() {
-        videoPlayer.enterFullScreenMode()
+    // Utility method to play video at specific position
+    fun playVideoAt(position: Int) {
+        val viewHolder = recyclerView.findViewHolderForAdapterPosition(position) as? VideosAdapter.VideoViewHolder
+        viewHolder?.playVideo()
     }
 
-    private fun exitFullScreen() {
-        videoPlayer.exitFullScreenMode()
-    }
-
-    private fun lockPlayer() {
-        videoPlayer.lockPlayer()
-    }
-
-    private fun unlockPlayer() {
-        videoPlayer.unlockPlayer()
-    }
-
-    private fun showControls() {
-        videoPlayer.showControlsManually()
-    }
-
-    private fun hideControls() {
-        videoPlayer.hideControlsManually()
+    // Utility method to pause video at specific position
+    fun pauseVideoAt(position: Int) {
+        val viewHolder = recyclerView.findViewHolderForAdapterPosition(position) as? VideosAdapter.VideoViewHolder
+        viewHolder?.pauseVideo()
     }
 }

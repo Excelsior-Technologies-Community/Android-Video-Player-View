@@ -35,29 +35,30 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     // Views
     private lateinit var videoView: VideoView
     private lateinit var titleTextView: TextView
+    private lateinit var subtitleTextView: TextView
     private lateinit var playPauseButton: ImageView
     private lateinit var seekBar: SeekBar
     private lateinit var currentTimeTextView: TextView
     private lateinit var totalTimeTextView: TextView
     private lateinit var controlsContainer: ViewGroup
     private lateinit var tvLockRemove: TextView
-    private lateinit var ivSettings: ImageView
     private lateinit var tvSpeed: TextView
-    private lateinit var ivSubtitle: ImageView
     private lateinit var ivScreenRotation: ImageView
-    private lateinit var ivPip: ImageView
-    private lateinit var ivLock: ImageView
     private lateinit var ivFullScreen: ImageView
     private lateinit var loadingIndicator: ProgressBar
     private lateinit var volumeBrightnessIndicator: LinearLayout
     private lateinit var ivVolumeBrightnessIcon: ImageView
     private lateinit var pbVolumeBrightness: ProgressBar
+    private var autoPlay = false
+    private var wasPlayingBeforeRotation = false
+    private var defaultPlayState = false
 
     // Gesture Detection
     private lateinit var gestureDetector: GestureDetector
 
     // Properties
     private var videoTitle: String = ""
+    private var videoSubtitle: String = ""
     private var videoUri: Uri? = null
     private var isPlaying = false
     private var currentPosition = 0
@@ -99,10 +100,7 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             handler.postDelayed(this, 1000)
         }
     }
-    private val hideLockTextRunnable = Runnable {
-        tvLockRemove.visibility = View.GONE
-        unlockControls()
-    }
+
     private val hideVolumeIndicatorRunnable = Runnable {
         volumeBrightnessIndicator.visibility = View.GONE
     }
@@ -125,18 +123,15 @@ class VideoPlayerLibrary @JvmOverloads constructor(
         // Initialize views
         videoView = findViewById(R.id.video_view)
         titleTextView = findViewById(R.id.tv_video_title)
+        subtitleTextView = findViewById(R.id.tv_video_subtitle)
         playPauseButton = findViewById(R.id.btn_play_pause)
         seekBar = findViewById(R.id.seek_bar)
         currentTimeTextView = findViewById(R.id.tv_current_time)
         totalTimeTextView = findViewById(R.id.tv_total_time)
         controlsContainer = findViewById(R.id.controls_container)
         tvLockRemove = findViewById(R.id.tvLockRemove)
-        ivSettings = findViewById(R.id.iv_quality_settings)
         tvSpeed = findViewById(R.id.tv_speed)
-        ivSubtitle = findViewById(R.id.iv_subtitle)
         ivScreenRotation = findViewById(R.id.iv_screen_rotation)
-        ivPip = findViewById(R.id.iv_pip)
-        ivLock = findViewById(R.id.iv_lock)
         ivFullScreen = findViewById(R.id.iv_full_screen)
         loadingIndicator = findViewById(R.id.loading_indicator)
         volumeBrightnessIndicator = findViewById(R.id.volume_brightness_indicator)
@@ -245,6 +240,11 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
+        subtitleTextView.apply {
+            setTextColor(textColor)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            text = videoSubtitle
+        }
         currentTimeTextView.apply {
             setTextColor(textColor)
             textSize = timeTextSize / resources.displayMetrics.scaledDensity
@@ -269,13 +269,7 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             thumbTintList = android.content.res.ColorStateList.valueOf(primaryColor)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
-
-        // Apply tint to control buttons
-        ivSettings.setColorFilter(primaryColor)
-        ivSubtitle.setColorFilter(primaryColor)
         ivScreenRotation.setColorFilter(primaryColor)
-        ivPip.setColorFilter(primaryColor)
-        ivLock.setColorFilter(primaryColor)
         ivFullScreen.setColorFilter(primaryColor)
 
         // Make backgrounds transparent
@@ -303,6 +297,21 @@ class VideoPlayerLibrary @JvmOverloads constructor(
 
             // Extract quality options
             extractVideoQuality()
+
+            // Restore position if coming from rotation
+            if (currentPosition > 0) {
+                videoView.seekTo(currentPosition)
+                updateSeekBar()
+            }
+
+            // Only auto-play if explicitly set or restoring from rotation
+            if (autoPlay || wasPlayingBeforeRotation) {
+                play()
+                wasPlayingBeforeRotation = false
+            } else {
+                // Default state is paused
+                pause()
+            }
 
             if (autoHideControls) {
                 scheduleHideControls()
@@ -333,7 +342,6 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             false
         }
     }
-
     private fun setupControls() {
         playPauseButton.setOnClickListener {
             if (!isLocked) {
@@ -368,12 +376,7 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     }
 
     private fun setupAdvancedControls() {
-        // Quality Settings
-        ivSettings.setOnClickListener {
-            if (!isLocked) {
-                showQualitySpinner()
-            }
-        }
+
 
         // Speed Control
         tvSpeed.setOnClickListener {
@@ -382,12 +385,7 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             }
         }
 
-        // Subtitle Control
-        ivSubtitle.setOnClickListener {
-            if (!isLocked) {
-                showSubtitleSpinner()
-            }
-        }
+
 
         // Screen Rotation
         ivScreenRotation.setOnClickListener {
@@ -396,17 +394,6 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             }
         }
 
-        // Picture in Picture
-        ivPip.setOnClickListener {
-            if (!isLocked) {
-                enterPictureInPictureMode()
-            }
-        }
-
-        // Lock/Unlock
-        ivLock.setOnClickListener {
-            toggleLockMode()
-        }
 
         // Full Screen
         ivFullScreen.setOnClickListener {
@@ -416,21 +403,7 @@ class VideoPlayerLibrary @JvmOverloads constructor(
         }
 
         // Long press for lock removal
-        tvLockRemove.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    lockTouchStartTime = System.currentTimeMillis()
-                    handler.postDelayed(hideLockTextRunnable, lockHoldDuration)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    handler.removeCallbacks(hideLockTextRunnable)
-                    lockTouchStartTime = 0L
-                    true
-                }
-                else -> false
-            }
-        }
+
     }
 
     private fun showQualitySpinner() {
@@ -525,10 +498,9 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     private fun toggleScreenOrientation() {
         val activity = context as? Activity ?: return
 
-        // Store current position to continue from same time
-        if (isPlaying) {
-            currentPosition = videoView.currentPosition
-        }
+        // Store current state before rotation
+        currentPosition = videoView.currentPosition
+        wasPlayingBeforeRotation = isPlaying
 
         val currentOrientation = resources.configuration.orientation
         val newOrientation = if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -538,101 +510,11 @@ class VideoPlayerLibrary @JvmOverloads constructor(
         }
 
         activity.requestedOrientation = newOrientation
-
-        // Resume from stored position after orientation change
-        handler.postDelayed({
-            if (currentPosition > 0) {
-                videoView.seekTo(currentPosition)
-            }
-        }, 100)
-
         onVideoPlayerListener?.onOrientationChanged(newOrientation)
     }
 
-    private fun enterPictureInPictureMode() {
-        val activity = context as? Activity ?: return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                // Check if PiP is supported
-                val packageManager = activity.packageManager
-                if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
-                    Toast.makeText(context, "Picture-in-Picture not supported on this device", Toast.LENGTH_SHORT).show()
-                    return
-                }
 
 
-
-                val aspectRatio = Rational(16, 9)
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(aspectRatio)
-                    .build()
-
-                val success = activity.enterPictureInPictureMode(params)
-                if (success) {
-                    isInPipMode = true
-                    onVideoPlayerListener?.onPictureInPictureModeChanged(true)
-                } else {
-                    Toast.makeText(context, "Failed to enter Picture-in-Picture mode", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(context, "Picture-in-Picture not available: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            Toast.makeText(context, "Picture-in-Picture requires Android 8.0 or higher", Toast.LENGTH_SHORT).show()
-        }
-    }
-    private fun toggleLockMode() {
-        if (isLocked) {
-            // Show lock removal text
-            tvLockRemove.visibility = View.VISIBLE
-        } else {
-            lockControls()
-        }
-    }
-
-    private fun lockControls() {
-        isLocked = true
-        ivLock.setImageResource(R.drawable.ic_lock_screen_touch)
-
-        // Hide all controls except lock button
-        playPauseButton.visibility = View.GONE
-        seekBar.visibility = View.GONE
-        currentTimeTextView.visibility = View.GONE
-        totalTimeTextView.visibility = View.GONE
-        ivSettings.visibility = View.GONE
-        tvSpeed.visibility = View.GONE
-        ivSubtitle.visibility = View.GONE
-        ivScreenRotation.visibility = View.GONE
-        ivPip.visibility = View.GONE
-        ivFullScreen.visibility = View.GONE
-        titleTextView.visibility = View.GONE
-
-        Toast.makeText(context, "Player Locked", Toast.LENGTH_SHORT).show()
-        onVideoPlayerListener?.onPlayerLocked(true)
-    }
-
-    private fun unlockControls() {
-        isLocked = false
-        ivLock.setImageResource(R.drawable.ic_lock_screen_touch)
-
-        // Show all controls
-        playPauseButton.visibility = View.VISIBLE
-        seekBar.visibility = View.VISIBLE
-        currentTimeTextView.visibility = View.VISIBLE
-        totalTimeTextView.visibility = View.VISIBLE
-        ivSettings.visibility = View.VISIBLE
-        tvSpeed.visibility = View.VISIBLE
-        ivSubtitle.visibility = View.VISIBLE
-        ivScreenRotation.visibility = View.VISIBLE
-        ivPip.visibility = View.VISIBLE
-        ivFullScreen.visibility = View.VISIBLE
-        titleTextView.visibility = View.VISIBLE
-
-        Toast.makeText(context, "Player Unlocked", Toast.LENGTH_SHORT).show()
-        onVideoPlayerListener?.onPlayerLocked(false)
-    }
 
     private fun toggleFullScreen() {
         val activity = context as? Activity ?: return
@@ -935,11 +817,19 @@ class VideoPlayerLibrary @JvmOverloads constructor(
         this.videoUri = uri
         videoView.setVideoURI(uri)
         loadingIndicator.visibility = View.VISIBLE
+        // Reset auto-play flag unless explicitly set
+        if (!autoPlay) {
+            wasPlayingBeforeRotation = false
+        }
     }
-
     fun setVideoTitle(title: String) {
         this.videoTitle = title
         titleTextView.text = title
+    }
+
+    fun setVideoSubtitle(subtitle: String) {
+        this.videoSubtitle = subtitle
+        titleTextView.text = subtitle
     }
 
     fun setOnVideoPlayerListener(listener: OnVideoPlayerListener) {
@@ -1005,47 +895,39 @@ class VideoPlayerLibrary @JvmOverloads constructor(
         }
     }
 
-    fun lockPlayer() {
-        if (!isLocked) {
-            lockControls()
-        }
-    }
 
-    fun unlockPlayer() {
-        if (isLocked) {
-            unlockControls()
-        }
-    }
+
 
     // Handle configuration changes
     override fun onConfigurationChanged(newConfig: Configuration?) {
         super.onConfigurationChanged(newConfig)
 
-        // Maintain video position during orientation change
-        if (isPlaying) {
+        // Store current state
+        val wasPlaying = isPlaying
+        if (wasPlaying) {
             currentPosition = videoView.currentPosition
         }
 
         // Adjust layout for orientation
         when (newConfig?.orientation) {
             Configuration.ORIENTATION_LANDSCAPE -> {
-                // Landscape mode adjustments
                 titleTextView.textSize = (timeTextSize / resources.displayMetrics.scaledDensity) * 0.8f
             }
             Configuration.ORIENTATION_PORTRAIT -> {
-                // Portrait mode adjustments
                 titleTextView.textSize = titleTextSize / resources.displayMetrics.scaledDensity
             }
         }
 
-        // Resume from stored position
+        // Restore state after a short delay
         handler.postDelayed({
             if (currentPosition > 0) {
                 videoView.seekTo(currentPosition)
+                if (wasPlaying) {
+                    wasPlayingBeforeRotation = true
+                }
             }
         }, 100)
     }
-
     // Handle Picture-in-Picture mode changes
     @RequiresApi(Build.VERSION_CODES.O)
     fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
@@ -1071,7 +953,6 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     fun release() {
         handler.removeCallbacks(updateSeekBarRunnable)
         handler.removeCallbacks(hideControlsRunnable)
-        handler.removeCallbacks(hideLockTextRunnable)
         handler.removeCallbacks(hideVolumeIndicatorRunnable)
 
         videoView.stopPlayback()
@@ -1150,9 +1031,6 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             tvSpeed.text = "${currentPlaybackSpeed}X"
             titleTextView.text = videoTitle
 
-            if (isLocked) {
-                lockControls()
-            }
 
             if (currentPosition > 0) {
                 handler.postDelayed({
@@ -1217,5 +1095,36 @@ class VideoPlayerLibrary @JvmOverloads constructor(
 
     fun onDestroy() {
         release()
+    }
+
+    fun setAutoPlay(autoPlay: Boolean) {
+        this.autoPlay = autoPlay
+    }
+
+    fun getAutoPlay(): Boolean = autoPlay
+
+    fun playVideo() {
+        if (!isPlaying) {
+            play()
+        }
+    }
+
+    fun pauseVideo() {
+        if (isPlaying) {
+            pause()
+        }
+    }
+
+    fun togglePlayPauseManually() {
+        togglePlayPause()
+    }
+
+    fun isVideoReady(): Boolean {
+        return totalDuration > 0
+    }
+
+    fun setVideoUriWithAutoPlay(uri: Uri, autoPlay: Boolean = false) {
+        this.autoPlay = autoPlay
+        setVideoUri(uri)
     }
 }

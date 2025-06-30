@@ -7,12 +7,13 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.ext.videoplayerlibrary.VideoPlayerLibrary
-        android:id="@+id/videoPlayer"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvVideos"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:backgroundTint="@android:color/transparent"
         android:background="@android:color/transparent"
+        android:nestedScrollingEnabled="false"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
