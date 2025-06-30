@@ -36,7 +36,7 @@ allprojects {
 
 ```gradle
 dependencies {
-    implementation 'com.github.yashraiyani098:VideoPlayerLibrary:1.0.0'
+    implementation("com.github.yashraiyani098:VideoPlayerLibrary:1.0.0")
 }
 ```
 

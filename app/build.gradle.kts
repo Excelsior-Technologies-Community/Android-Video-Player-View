@@ -49,5 +49,5 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    implementation(project(":VideoPlayerLibrary"))
+    implementation("com.github.yashraiyani098:VideoPlayerLibrary:1.0.0")
 }
