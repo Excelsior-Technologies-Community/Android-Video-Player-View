@@ -270,7 +270,12 @@ class VideoPlayerLibrary @JvmOverloads constructor(
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
         ivScreenRotation.setColorFilter(primaryColor)
-        ivFullScreen.setColorFilter(primaryColor)
+        ivFullScreen.apply {
+            setColorFilter(primaryColor)
+            setOnClickListener {
+                toggleFullScreen()
+            }
+        }
 
         // Make backgrounds transparent
         videoView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -496,48 +501,73 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     }
 
     private fun toggleScreenOrientation() {
-        val activity = context as? Activity ?: return
-
-        // Store current state before rotation
-        currentPosition = videoView.currentPosition
-        wasPlayingBeforeRotation = isPlaying
-
-        val currentOrientation = resources.configuration.orientation
-        val newOrientation = if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE) {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // Toggle screen orientation
+        val activity = context as? Activity
+        activity?.requestedOrientation = if (activity?.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
-
-        activity.requestedOrientation = newOrientation
-        onVideoPlayerListener?.onOrientationChanged(newOrientation)
     }
-
-
-
 
     private fun toggleFullScreen() {
         val activity = context as? Activity ?: return
 
+        isFullScreen = !isFullScreen
+
         if (isFullScreen) {
-            // Exit full screen
-            activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-            ivFullScreen.setImageResource(R.drawable.ic_full_screen)
-            isFullScreen = false
-        } else {
-            // Enter full screen
-            activity.window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_FULLSCREEN or
-                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
-            activity.window.setFlags(
-                WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            // Enter full screen mode
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            
+            // Adjust layout for full screen
+            layoutParams = LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
-            ivFullScreen.setImageResource(R.drawable.ic_full_screen)
-            isFullScreen = true
+
+            // Adjust controls visibility and size
+            controlsContainer.apply {
+                visibility = View.VISIBLE
+                alpha = 0.8f
+            }
+
+            // Adjust video view size
+            videoView.apply {
+                layoutParams = LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                requestLayout()
+            }
+
+            // Keep screen on in full screen mode
+            keepScreenOn = true
+        } else {
+            // Exit full screen mode
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            
+            // Adjust layout for normal mode
+            layoutParams = LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            // Restore normal controls
+            controlsContainer.apply {
+                alpha = 1.0f
+            }
+
+            // Adjust video view size
+            videoView.apply {
+                layoutParams = LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                requestLayout()
+            }
+
+            // Restore screen on behavior
+            keepScreenOn = false
         }
 
         onVideoPlayerListener?.onFullScreenChanged(isFullScreen)
@@ -962,18 +992,11 @@ class VideoPlayerLibrary @JvmOverloads constructor(
     // Pause video when view is not visible
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-
-        when (visibility) {
-            View.GONE, View.INVISIBLE -> {
-                if (isPlaying && !isInPipMode) {
-                    pause()
-                }
-            }
-            View.VISIBLE -> {
-                // Resume if it was playing before
-                if (!isPlaying && currentPosition > 0) {
-                    // Don't auto-resume, let user decide
-                }
+        if (visibility == View.GONE || visibility == View.INVISIBLE) {
+            pauseVideo()
+        } else if (visibility == View.VISIBLE) {
+            if (wasPlayingBeforeRotation) {
+                playVideo()
             }
         }
     }
